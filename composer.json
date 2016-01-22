@@ -13,6 +13,7 @@
             "email": "peterlcole@gmail.com"
         }
     ],
+    "version": "1.0.0",
     "autoload": {
         "files": [
             "init.php"
