@@ -10,7 +10,8 @@
     "authors": [
         {
             "name": "Peter Cole", 
-            "email": "peterlcole@gmail.com"
+            "email": "peterlcole@gmail.com",
+            "homepage": "http://bolt.cm"
         }
     ],
     "autoload": {
@@ -21,9 +22,5 @@
             "Bolt\\Extension\\Peterlcole\\Slack\\": "",
             "Bolt\\Extension\\Peterlcole\\Slack\\Tests\\": "tests"
         }
-    },
-    
-    "extra": {
-        "bolt-assets": "assets"
     }
 }
