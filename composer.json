@@ -1,0 +1,29 @@
+{
+    "name": "peterlcole/slack",
+    "description": "A Bolt extension that will feed an Incoming Webhook for Slack",
+    "type": "bolt-extension",
+    "keywords" : [ "bolt", "slack" ],
+    "require": {
+        "bolt/bolt": ">=2.0.0,<3.0.0"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Peter Cole", 
+            "email": "peterlcole@gmail.com"
+        }
+    ],
+    "autoload": {
+        "files": [
+            "init.php"
+        ],
+        "psr-4": {
+            "Bolt\\Extension\\Peterlcole\\Slack\\": "",
+            "Bolt\\Extension\\Peterlcole\\Slack\\Tests\\": "tests"
+        }
+    },
+    
+    "extra": {
+        "bolt-assets": "assets"
+    }
+}
