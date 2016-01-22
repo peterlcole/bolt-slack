@@ -27,7 +27,7 @@ If provided, this will be the name that Slack uses in the chat.
 **content** [array, required]  
 Only storage events related to the specified content will be sent to Slack
 
-**<contenttype>** [array, required]  
+**\<contenttype\>** [array, required]  
 A type of content to act on. E.g., `pages:`. Must be lower case.
 
 **channels** [array, required]  
