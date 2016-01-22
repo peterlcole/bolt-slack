@@ -1,5 +1,5 @@
 {
-    "name": "peterlcole/slack",
+    "name": "peterlcole/bolt-slack",
     "description": "A Bolt extension that will feed an Incoming Webhook for Slack",
     "type": "bolt-extension",
     "keywords" : [ "bolt", "slack" ],
