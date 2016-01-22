@@ -1,17 +1,16 @@
 {
     "name": "peterlcole/bolt-slack",
-    "description": "A Bolt extension that will feed an Incoming Webhook for Slack",
+    "description": "A Bolt extension that will feed an Incoming Webhook for Slack.",
     "type": "bolt-extension",
-    "keywords" : [ "bolt", "slack" ],
+    "keywords": ["bolt", "slack"],
     "require": {
         "bolt/bolt": ">=2.0.0,<3.0.0"
     },
     "license": "MIT",
     "authors": [
         {
-            "name": "Peter Cole", 
-            "email": "peterlcole@gmail.com",
-            "homepage": "http://bolt.cm"
+            "name": "Peter Cole",
+            "email": "peterlcole@gmail.com"
         }
     ],
     "autoload": {
