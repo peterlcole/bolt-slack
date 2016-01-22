@@ -100,7 +100,7 @@ class Extension extends BaseExtension
         $hookFound   = in_array($hook, $this->extensionConfig['content'][$event->getContentType()]['events']);
 
         $actions = array(
-            'create'   => 'created',
+            'create' => 'created',
             'update' => 'updated',
         );
 
@@ -127,11 +127,7 @@ class Extension extends BaseExtension
         $channels = $this->app['config']->get('general/slack/content/' . $contentType . '/channels', null);
         $channels = is_array($channels) ? $channels : array($channels);
 
-$this->app['logger.system']->addInfo(var_export($channels, true), array('event' => 'content'));
-
         foreach ($channels as $channel) {
-
-$this->app['logger.system']->addInfo('Sending over ' . $channel, array('event' => 'content'));
 
             $data = array(
                 'payload' => array(
