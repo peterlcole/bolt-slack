@@ -142,7 +142,7 @@ class Extension extends BaseExtension
 
             $data = json_encode($data['payload']);
 
-            $ch = curl_init('https://hooks.slack.com/services/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');
+            $ch = curl_init($this->extensionConfig['webhook_url']);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);                                                                  
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                                      
             curl_setopt( $ch, CURLOPT_HTTPHEADER, array('Content-Type:application/json'));                                                                                                               
