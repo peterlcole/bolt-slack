@@ -9,10 +9,6 @@ use Bolt\Content;
 class Extension extends BaseExtension
 {
     /**
-     * @var array Extension related config
-     */
-    protected $extensionConfig;
-    /**
      * @var \Bolt\Content
      */
     protected $content;
@@ -40,14 +36,14 @@ class Extension extends BaseExtension
         $sanityCheck = $this->sanityCheck();
         $contentType = $this->content->contenttype['slug'];
         $hook        = 'delete';
-        $config      = $this->extensionConfig['events'][$hook][$contentType];
+        $config      = $this->config['events'][$hook][$contentType];
 
         if (false === $sanityCheck OR null === $config) {
             return;
         }
 
-        if (isset($this->extensionConfig['template_path']) AND isset($config['template'])) {
-            $config['templateDir'] = $this->extensionConfig['template_dir'];
+        if (isset($this->config['template_path']) AND isset($config['template'])) {
+            $config['templateDir'] = $this->config['template_dir'];
         } else {
             $config['templateDir'] = __DIR__ . '/templates';
             $config['template']    = $hook . '.twig';
@@ -85,26 +81,25 @@ class Extension extends BaseExtension
     protected function sanityCheck()
     {
         $isSane = true;
-        $this->extensionConfig = $this->app['config']->get('general/slack', null);
 
         // Return early for root config
-        if (null === $this->extensionConfig) {
-            $msg  = 'Missing bolt-slack configuration: slack';
+        if (empty($this->config)) {
+            $msg  = 'Missing bolt-slack configuration.';
             $this->app['logger.system']->addError($msg, array('event' => 'content'));
             return false;
         }
 
-        if (false === isset($this->extensionConfig['webhook_url'])) {
-            $msg    = 'Missing bolt-slack configuration: webhook_url';
+        if (false === isset($this->config['webhook_url']) OR null === $this->config['webhook_url']) {
+            $msg    = 'Missing or invalid bolt-slack configuration: webhook_url';
             $isSane = false;
         }
 
-        if (false === isset($this->extensionConfig['events'])) {
+        if (false === isset($this->config['events'])) {
             $msg    = 'Missing bolt-slack configuration: events';
             $isSane = false;
         }
 
-        foreach ($this->extensionConfig['events'] as $contentTypes) {
+        foreach ($this->config['events'] as $contentTypes) {
 
             foreach ($contentTypes as $contentType => $config) {
                 if (false === isset($config['channels'])) {
@@ -124,16 +119,15 @@ class Extension extends BaseExtension
 
     public function saveContent(\Bolt\Events\StorageEvent $event)
     {
-        $sanityCheck = $this->sanityCheck();
         $hook        = $event->isCreate() ? 'create' : 'update';
-        $config      = $this->extensionConfig['events'][$hook][$event->getContentType()];
+        $config      = $this->config['events'][$hook][$event->getContentType()];
 
-        if (false === $sanityCheck OR null === $config) {
+        if (false === $this->sanityCheck() OR null === $config) {
             return;
         }
 
-        if (isset($this->extensionConfig['template_path']) AND isset($config['template'])) {
-            $config['templateDir'] = $this->app['resources']->getPath('rootpath') . $this->extensionConfig['template_path'];
+        if (isset($this->config['template_path']) AND isset($config['template'])) {
+            $config['templateDir'] = $this->app['resources']->getPath('rootpath') . $this->config['template_path'];
         } else {
             $config['templateDir'] = __DIR__ . '/templates';
             $config['template']    = $hook . '.twig';
@@ -166,17 +160,15 @@ class Extension extends BaseExtension
                 'text'     => $this->app['render']->render($config['template'], $data)->__toString(),
             );
 
-            if (isset($this->extensionConfig['username'])) {
-                $payload['username'] = $this->extensionConfig['username'];
+            if (isset($this->config['username']) AND null !== $this->config['username']) {
+                $payload['username'] = $this->config['username'];
             }
 
             $payload = array(
                 'body'        => json_encode($payload),
             );
 
-            file_put_contents('/tmp/storage.' . $channel . '.log', var_export($payload, true));
-
-            $request = $this->app['guzzle.client']->post($this->extensionConfig['webhook_url'], $payload);
+            $request = $this->app['guzzle.client']->post($this->config['webhook_url'], $payload);
         }
     }
  }

@@ -1,0 +1,12 @@
+username: ~
+webhook_url: ~~
+events:
+    create:
+        pages:
+            channels: ['#general']
+    update:
+        pages:
+            channels: ['#general']
+    delete:
+        pages:
+            channels: ['#general']
