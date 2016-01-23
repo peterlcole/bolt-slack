@@ -4,10 +4,13 @@ namespace Bolt\Extension\Peterlcole\Slack;
 
 use Bolt\Application;
 use Bolt\BaseExtension;
+use Bolt\Content;
 
 class Extension extends BaseExtension
 {
     protected $extensionConfig;
+
+    protected $content;
 
     public function getName()
     {
@@ -17,15 +20,26 @@ class Extension extends BaseExtension
     public function initialize()
     {
         $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::POST_SAVE,  array($this, 'saveContent'));
-        $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::PRE_DELETE, array($this, 'deleteContent'));
+        $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::PRE_DELETE, array($this, 'preDelete'));
+        $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::POST_DELETE, array($this, 'deleteContent'));
     }
 
+    /**
+     * Retrieve and store content information to be used in the POST_DELETE callback
+     */
+    public function preDelete($event)
+    {
+        $this->loadContent($event->getArguments()['contenttype'], $event->getSubject()['id']);
+    }
 
     public function deleteContent(\Bolt\Events\StorageEvent $event)
     {
+
         if (false === $this->sanityCheck()) {
             return;   
         }
+
+        file_put_contents('/tmp/storage.log', var_export($event->getContent(), true));
 
         $contentType = $event->getArguments();
         $contentType = $contentType['contenttype'];
@@ -89,49 +103,53 @@ class Extension extends BaseExtension
     }
 
 
-    public function saveContent(\Bolt\Events\StorageEvent $event)
+    protected function loadContent($contentType, $contentId)
     {
-        if (false === $this->sanityCheck()) {
-            return;   
-        }
-
-        $content     = $event->getContent();
-        $hook        = $event->isCreate() ? 'create' : 'update';
-        $hookFound   = in_array($hook, $this->extensionConfig['content'][$event->getContentType()]['events']);
-
-        $actions = array(
-            'create' => 'created',
-            'update' => 'updated',
-        );
-
-        if ($hookFound) {
-
-            $currentUser = $this->app['users']->getCurrentUser();
-            $contentType = strtolower($content->contenttype['singular_name']);
-            $link        = $this->app['resources']->getUrl('rooturl') . strtolower($event->getContentType()) . '/' . $event->getId();
-            $msg         = sprintf('%s %s %s <%s|%s>', 
-                ucfirst($currentUser['displayname']), 
-                $actions[$hook],
-                $contentType,
-                $link,
-                $content->getTitle()
-            );
-
-            $this->send($msg, $event->getContentType());
-        }
+        $this->content              = $this->app['storage']->getContent($contentType . '/' . $contentId);
+        $this->content->owner       = $this->app['users']->getUser($this->content->getValues()['ownerid']);
     }
 
 
-    protected function send($msg, $contentType) 
+    public function saveContent(\Bolt\Events\StorageEvent $event)
     {
-        $channels = $this->app['config']->get('general/slack/content/' . $contentType . '/channels', null);
-        $channels = is_array($channels) ? $channels : array($channels);
+        $this->extensionConfig = $this->app['config']->get('general/slack', null);
+        $hook                  = $event->isCreate() ? 'create' : 'update';
+        $config                = $this->extensionConfig['events'][$hook][$event->getContentType()];
+
+        if (null === $config) {
+            return;
+        }
+
+        if (isset($this->extensionConfig['template_path']) AND isset($config['template'])) {
+            $config['templateDir'] = $this->extensionConfig['template_dir'];
+        } else {
+            $config['templateDir'] = __DIR__ . '/templates';
+            $config['template']    = $hook . '.twig';
+        }
+file_put_contents('/tmp/storage.log', var_export($config, true));
+// return;
+        $this->send($event->getContentType(), $event->getId(), $config);
+    }
+
+
+    protected function send($contentType, $contentId, $config)
+    {
+        $this->app['twig.loader.filesystem']->prependPath($config['templateDir']);
+        $this->loadContent($contentType, $contentId);
+
+        $data = array(
+            'content'     => $this->content,
+            'currentUser' => $this->app['users']->getCurrentUser(),
+            'rootUrl'     => rtrim($this->app['resources']->getUrl('rooturl'), '/'),
+        );
+
+        $channels = is_array($config['channels']) ? $config['channels'] : array($config['channels']);
 
         foreach ($channels as $channel) {
 
             $data = array(
                 'channel'  => $channel,
-                'text'     => $msg,
+                'text'     => $this->app['render']->render($config['template'], $data)->__toString()
             );
 
             if ($this->extensionConfig['username']) {
