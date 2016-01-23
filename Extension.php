@@ -130,24 +130,19 @@ class Extension extends BaseExtension
         foreach ($channels as $channel) {
 
             $data = array(
-                'payload' => array(
-                    'channel'  => $channel,
-                    'text'     => $msg,
-                ),
+                'channel'  => $channel,
+                'text'     => $msg,
             );
 
             if ($this->extensionConfig['username']) {
-                $data['payload']['username'] = $this->extensionConfig['username'];
+                $data['username'] = $this->extensionConfig['username'];
             }
 
-            $data = json_encode($data['payload']);
+            $data = array(
+                'body' => json_encode($data),
+            );
 
-            $ch = curl_init('https://hooks.slack.com/services/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');
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);                                                                  
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                                      
-            curl_setopt( $ch, CURLOPT_HTTPHEADER, array('Content-Type:application/json'));                                                                                                               
-                                                                                                                                 
-            $result = curl_exec($ch);
+            $request = $this->app['guzzle.client']->post($this->extensionConfig['webhook_url'], $data);
         }
     }
 }
