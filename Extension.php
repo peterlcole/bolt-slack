@@ -126,8 +126,7 @@ class Extension extends BaseExtension
             $config['templateDir'] = __DIR__ . '/templates';
             $config['template']    = $hook . '.twig';
         }
-file_put_contents('/tmp/storage.log', var_export($config, true));
-// return;
+
         $this->send($event->getContentType(), $event->getId(), $config);
     }
 
