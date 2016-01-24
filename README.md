@@ -1,67 +1,94 @@
-# Slack
+# Bolt-Slack
 
 Send Bolt's content related events to Slack using [incoming-webhooks](https://api.slack.com/incoming-webhooks). 
 
 ## Configuration
 
-To your *config.yml*, add the following options:
+After installing the plugin through the [Extension Store](https://extensions.bolt.cm/view/dbeb5c20-c10f-11e5-bf25-14cdca8e654f), Bolt will create _app/config/extensions/bolt-slack.peterlcole.yml_ with the following content:
 ```
-slack:
-    web_hook:
-    username:
-    content:
-        <contenttype>:
+username: ~
+webhook_url: ~
+template_path: ~
+events:
+    create:
+        pages:
             channels: ['#general']
-            events:
-                - create
-                - delete
-                - update
+            template: ~
+    update:
+        pages:
+            channels: ['#general']
+            template: ~
+    delete:
+        pages:
+            channels: ['#general']
+            template: ~
 ```
+**username** [string, optional]  
+If provided, this will be the name that Slack uses in the chat.
 
 **web_hook** [string, required]  
 The url that incoming-webooks provides for you. It will start with *https://hooks.slack.com/services/*
 
-**username** [string, optional]  
-If provided, this will be the name that Slack uses in the chat.
+**template_path** [string, optional]  
+The directory, relative to Bolt's installation path, that holds the Twig templates used to format Slack messages. This will be ignored if a **template** is not specified.
 
-**content** [array, required]  
-Only storage events related to the specified content will be sent to Slack
-
-**\<contenttype\>** [array, required]  
-A type of content to act on. E.g., `pages:`. Must be lower case.
-
-**channels** [array, required]  
-The same event can be sent to multiple channels (anything starting with a *#*) as well as direct messages (user names prefixed with *@*).
-
-**events** [array, required]  
-The events that should be sent to Slack. Possible values are:
+**events : \<event\>** [array, required]  
+The events that should be acted on. Possible values are:
 * create
 * delete
 * update
 
+**events : \<event\> : \<contenttype\>** [array, required]  
+Only the contenttypes you specify will be acted on.
+
+**events : \<event\> : \<contenttype\> : channels** [array, required]  
+An array of message receivers. Can be channels (e.g., '#general') or direct messages (e.g., '@intendedusername').
+
+**events : \<event\> : \<contenttype\> : template** [array, required]  
+The name of a Twig file in the **template_path** directory that will be used for these messages. This will be ignored if **template_path** is not specified.
+
 ### Configuration examples
 ```
-slack:
-    web_hook: https://hooks.slack.com/services/ABC/DEF/123
-    username: Super Bolt Man
-    content:
+username: Super Slack Man
+webhook_url: https://hooks.slack.com/services/ABC/DEF/123
+template_path: ~
+events:
+    create:
         pages:
             channels: ['#general']
-            events:
-                - create
-                - update
-```
-```
-slack:
-    web_hook: https://hooks.slack.com/services/ABC/DEF/123
-    content:
+    delete:
         pages:
             channels: ['#general']
-            events:
-                - create
-                - update
-        entries:
-            channels: ['#editors', '@myslackusername']
-            events:
-                - delete
+```
+```
+webhook_url: https://hooks.slack.com/services/ABC/DEF/123
+events:
+    create:
+        pages:
+            channels: ['#general']
+        articles:
+            channels: ['#bloggers', '@editorusername']
+```
+```
+webhook_url: https://hooks.slack.com/services/ABC/DEF/123
+template_path: files/slack-templates
+events:
+    create:
+        pages:
+            channels: ['#general']
+            template: page-create.twig
+        articles:
+            channels: ['#bloggers', '@editorusername']
+            template: article-create.twig
+    update:
+        pages:
+            channels: ['#updatersclub']
+            template: page-update.twig
+    delete:
+        pages:
+            channels: ['#general']
+            template: page-delete.twig
+        articles:
+            channels: ['#general']
+            template: article-delete.twig
 ```
