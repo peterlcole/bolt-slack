@@ -4,150 +4,187 @@ namespace Bolt\Extension\Peterlcole\Slack;
 
 use Bolt\Application;
 use Bolt\BaseExtension;
+use Bolt\Content;
 
 class Extension extends BaseExtension
 {
-    protected $extensionConfig;
+    /**
+     * @var \Bolt\Content
+     */
+    protected $content;
+
 
     public function getName()
     {
-        return "Slack";
+        return "Bolt-Slack";
     }
+
 
     public function initialize()
     {
-        $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::POST_SAVE,  array($this, 'saveContent'));
-        $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::PRE_DELETE, array($this, 'deleteContent'));
+        $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::POST_SAVE,   array($this, 'saveContent'));
+        $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::PRE_DELETE,  array($this, 'preDelete'));
+        $this->app['dispatcher']->addListener(\Bolt\Events\StorageEvents::POST_DELETE, array($this, 'deleteContent'));
     }
 
 
+    /**
+     * Implements StorageEvents::POST_DELETE
+     */
     public function deleteContent(\Bolt\Events\StorageEvent $event)
     {
-        if (false === $this->sanityCheck()) {
-            return;   
+        $contentType = $this->content->contenttype['slug'];
+        $hook        = 'delete';
+        $config      = $this->config['events'][$hook][$contentType];
+
+        if (false === $this->sanityCheck() OR null === $config) {
+            return;
         }
 
-        $contentType = $event->getArguments();
-        $contentType = $contentType['contenttype'];
-        $content     = $event->getContent();
-        $hook        = 'delete';
-        $hookFound   = in_array('delete', $this->extensionConfig['content'][$contentType]['events']);
+        if (isset($this->config['template_path']) AND isset($config['template'])) {
+            $config['templateDir'] = $this->config['template_dir'];
+        } else {
+            $config['templateDir'] = __DIR__ . '/templates';
+            $config['template']    = $hook . '.twig';
+        }
 
-        if ($hookFound) {
+        $this->send($contentType, $this->content->get('id'), $config);
+    }
 
-            $currentUser = $this->app['users']->getCurrentUser();
-            $msg         = sprintf('%s deleted %s from %s.', 
-                ucfirst($currentUser['displayname']), 
-                $content['slug'],
-                $contentType
-            );
 
-            $this->send($msg, $contentType);
+    /**
+     * A helper method to query the database for a specific piece of content.
+     */
+    protected function loadContent($contentType, $contentId)
+    {
+        $this->content = $this->app['storage']->getContent($contentType . '/' . $contentId);
+
+        // If the content is not published then $content will be false. Consequently, the extension will explode if you
+        // treat it like an array so it is best if we just avoid doing that. The callbacks will test $content and exit
+        // early so this is safe.
+        if (false !== $this->content) {
+            $this->content->owner = $this->app['users']->getUser($this->content->getValues()['ownerid']);
         }
     }
 
 
+    /**
+     * The content related data available in the POST_DELETE event is limited so we use the PRE_DELETE hook to grab and
+     * save it before it is deleted.
+     */
+    public function preDelete($event)
+    {
+        $this->loadContent($event->getArguments()['contenttype'], $event->getSubject()['id']);
+    }
+
+
+    /**
+     * Make sure all requirements are met.
+     *
+     * Note: $this->loadContent() must be called before this method.
+     *
+     * @return bool
+     */
     protected function sanityCheck()
     {
-        $sane = true;
-        $this->extensionConfig = $this->app['config']->get('general/slack', null);
+        $isSane = true;
 
         // Return early for root config
-        if (null === $this->extensionConfig) {
-            $msg  = 'Missing option in config.yml: slack';
+        if (empty($this->config)) {
+            $msg  = 'Missing bolt-slack configuration.';
             $this->app['logger.system']->addError($msg, array('event' => 'content'));
             return false;
         }
 
-        if (false === isset($this->extensionConfig['webhook_url'])) {
-            $msg  = 'Missing option in config.yml: webhook_url';
-            $sane = false;
+        if (false === $this->content) {
+            $msg = 'Bolt-slack could not find the content. This is likely because the status is not published.';
+            $isSane = false;
         }
 
-        if (false === isset($this->extensionConfig['content'])) {
-            $msg  = 'Missing option in config.yml: content';
-            $sane = false;
+        if (false === isset($this->config['webhook_url']) OR null === $this->config['webhook_url']) {
+            $msg    = 'Missing or invalid bolt-slack configuration: webhook_url';
+            $isSane = false;
         }
 
-        foreach ($this->extensionConfig['content'] as $content) {
-            if (false === isset($content['channels'])) {
-                $msg  = 'Missing option in config.yml: channels';
-                $sane = false;
-            }   
-
-            if (false === isset($content['events'])) {
-                $msg  = 'Missing option in config.yml: events';
-                $sane = false;
-            }            
+        if (false === isset($this->config['events'])) {
+            $msg    = 'Missing bolt-slack configuration: events';
+            $isSane = false;
         }
 
-        if (false === $sane) {
+        foreach ($this->config['events'] as $contentTypes) {
+
+            foreach ($contentTypes as $contentType => $config) {
+                if (false === isset($config['channels'])) {
+                    $msg    = 'Missing bolt-slack ' . $contentType . ' configuration: channels';
+                    $isSane = false;
+                }   
+            }          
+        }
+
+        if (false === $isSane) {
             $this->app['logger.system']->addError($msg, array('event' => 'content'));
         }
 
-        return $sane;
+        return $isSane;
     }
 
 
     public function saveContent(\Bolt\Events\StorageEvent $event)
     {
-        if (false === $this->sanityCheck()) {
-            return;   
-        }
-
-        $content     = $event->getContent();
         $hook        = $event->isCreate() ? 'create' : 'update';
-        $hookFound   = in_array($hook, $this->extensionConfig['content'][$event->getContentType()]['events']);
+        $config      = $this->config['events'][$hook][$event->getContentType()];
 
-        $actions = array(
-            'create' => 'created',
-            'update' => 'updated',
-        );
+        $this->loadContent($event->getContentType(), $event->getId());
 
-        if ($hookFound) {
-
-            $currentUser = $this->app['users']->getCurrentUser();
-            $contentType = strtolower($content->contenttype['singular_name']);
-            $link        = $this->app['resources']->getUrl('rooturl') . strtolower($event->getContentType()) . '/' . $event->getId();
-            $msg         = sprintf('%s %s %s <%s|%s>', 
-                ucfirst($currentUser['displayname']), 
-                $actions[$hook],
-                $contentType,
-                $link,
-                $content->getTitle()
-            );
-
-            $this->send($msg, $event->getContentType());
+        if (false === $this->sanityCheck() OR null === $config ) {
+            return;
         }
+
+        if (isset($this->config['template_path']) AND null !== $this->config['template_path'] AND
+            isset($config['template']) AND null !== $this->config['template']) {
+
+            $config['templateDir'] = $this->app['resources']->getPath('rootpath') . $this->config['template_path'];
+
+        } else {
+            $config['templateDir'] = __DIR__ . '/templates';
+            $config['template']    = $hook . '.twig';
+        }
+
+        $this->send($event->getContentType(), $event->getId(), $config);
     }
 
 
-    protected function send($msg, $contentType) 
+    /**
+     * A helper method to send the events to all of the Slack channels/users
+     */
+    protected function send($contentType, $contentId, $config)
     {
-        $channels = $this->app['config']->get('general/slack/content/' . $contentType . '/channels', null);
-        $channels = is_array($channels) ? $channels : array($channels);
+        $this->app['twig.loader.filesystem']->prependPath($config['templateDir']);
+
+        $data = array(
+            'content'     => $this->content,
+            'currentUser' => $this->app['users']->getCurrentUser(),
+            'rootUrl'     => rtrim($this->app['resources']->getUrl('rooturl'), '/'),
+        );
+
+        $channels = is_array($config['channels']) ? $config['channels'] : array($config['channels']);
 
         foreach ($channels as $channel) {
 
-            $data = array(
-                'payload' => array(
-                    'channel'  => $channel,
-                    'text'     => $msg,
-                ),
+            $payload = array(
+                'channel'  => $channel,
+                'text'     => $this->app['render']->render($config['template'], $data)->__toString(),
             );
 
-            if ($this->extensionConfig['username']) {
-                $data['payload']['username'] = $this->extensionConfig['username'];
+            if (isset($this->config['username']) AND null !== $this->config['username']) {
+                $payload['username'] = $this->config['username'];
             }
 
-            $data = json_encode($data['payload']);
+            $payload = array(
+                'body'        => json_encode($payload),
+            );
 
-            $ch = curl_init($this->extensionConfig['webhook_url']);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $data);                                                                  
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                                      
-            curl_setopt( $ch, CURLOPT_HTTPHEADER, array('Content-Type:application/json'));                                                                                                               
-                                                                                                                                 
-            $result = curl_exec($ch);
+            $request = $this->app['guzzle.client']->post($this->config['webhook_url'], $payload);
         }
     }
-}
+ }

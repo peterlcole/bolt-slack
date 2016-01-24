@@ -1,0 +1,16 @@
+username: ~
+webhook_url: ~
+template_path: ~
+events:
+    create:
+        pages:
+            channels: ['#general']
+            template: ~
+    update:
+        pages:
+            channels: ['#general']
+            template: ~
+    delete:
+        pages:
+            channels: ['#general']
+            template: ~
