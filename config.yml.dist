@@ -1,16 +1,20 @@
+emoji: ~
+template_path: ~
 username: ~
 webhook_url: ~
-template_path: ~
 events:
     create:
         pages:
             channels: ['#general']
+            emoji: ~
             template: ~
     update:
         pages:
             channels: ['#general']
+            emoji: ~
             template: ~
     delete:
         pages:
             channels: ['#general']
+            emoji: ~
             template: ~

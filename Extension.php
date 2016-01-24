@@ -176,6 +176,14 @@ class Extension extends BaseExtension
                 'text'     => $this->app['render']->render($config['template'], $data)->__toString(),
             );
 
+            if (isset($this->config['emoji']) AND null !== $this->config['emoji']) {
+                $payload['icon_emoji'] = $this->config['emoji'];
+            }
+
+            if (isset($config['emoji']) AND null !== $config['emoji']) {
+                $payload['icon_emoji'] = $config['emoji'];
+            }
+
             if (isset($this->config['username']) AND null !== $this->config['username']) {
                 $payload['username'] = $this->config['username'];
             }
