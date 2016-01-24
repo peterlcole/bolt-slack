@@ -33,12 +33,11 @@ class Extension extends BaseExtension
      */
     public function deleteContent(\Bolt\Events\StorageEvent $event)
     {
-        $sanityCheck = $this->sanityCheck();
         $contentType = $this->content->contenttype['slug'];
         $hook        = 'delete';
         $config      = $this->config['events'][$hook][$contentType];
 
-        if (false === $sanityCheck OR null === $config) {
+        if (false === $this->sanityCheck() OR null === $config) {
             return;
         }
 
@@ -58,8 +57,14 @@ class Extension extends BaseExtension
      */
     protected function loadContent($contentType, $contentId)
     {
-        $this->content              = $this->app['storage']->getContent($contentType . '/' . $contentId);
-        $this->content->owner       = $this->app['users']->getUser($this->content->getValues()['ownerid']);
+        $this->content = $this->app['storage']->getContent($contentType . '/' . $contentId);
+
+        // If the content is not published then $content will be false. Consequently, the extension will explode if you
+        // treat it like an array so it is best if we just avoid doing that. The callbacks will test $content and exit
+        // early so this is safe.
+        if (false !== $this->content) {
+            $this->content->owner = $this->app['users']->getUser($this->content->getValues()['ownerid']);
+        }
     }
 
 
@@ -74,7 +79,9 @@ class Extension extends BaseExtension
 
 
     /**
-     * Make sure the extension's configuration is right.
+     * Make sure all requirements are met.
+     *
+     * Note: $this->loadContent() must be called before this method.
      *
      * @return bool
      */
@@ -87,6 +94,11 @@ class Extension extends BaseExtension
             $msg  = 'Missing bolt-slack configuration.';
             $this->app['logger.system']->addError($msg, array('event' => 'content'));
             return false;
+        }
+
+        if (false === $this->content) {
+            $msg = 'Bolt-slack could not find the content. This is likely because the status is not published.';
+            $isSane = false;
         }
 
         if (false === isset($this->config['webhook_url']) OR null === $this->config['webhook_url']) {
@@ -122,18 +134,22 @@ class Extension extends BaseExtension
         $hook        = $event->isCreate() ? 'create' : 'update';
         $config      = $this->config['events'][$hook][$event->getContentType()];
 
-        if (false === $this->sanityCheck() OR null === $config) {
+        $this->loadContent($event->getContentType(), $event->getId());
+
+        if (false === $this->sanityCheck() OR null === $config ) {
             return;
         }
 
-        if (isset($this->config['template_path']) AND isset($config['template'])) {
+        if (isset($this->config['template_path']) AND null !== $this->config['template_path'] AND
+            isset($config['template']) AND null !== $this->config['template']) {
+
             $config['templateDir'] = $this->app['resources']->getPath('rootpath') . $this->config['template_path'];
+
         } else {
             $config['templateDir'] = __DIR__ . '/templates';
             $config['template']    = $hook . '.twig';
         }
 
-        $this->loadContent($event->getContentType(), $event->getId());
         $this->send($event->getContentType(), $event->getId(), $config);
     }
 
