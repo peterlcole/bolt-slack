@@ -44,7 +44,7 @@ Only the contenttypes you specify will be acted on.
 **events : \<event\> : \<contenttype\> : channels** [array, required]  
 An array of message receivers. Can be channels (e.g., '#general') or direct messages (e.g., '@intendedusername').
 
-**events : \<event\> : \<contenttype\> : template** [array, required]  
+**events : \<event\> : \<contenttype\> : template** [array, optional]  
 The name of a Twig file in the **template_path** directory that will be used for these messages. This will be ignored if **template_path** is not specified.
 
 ### Configuration examples
